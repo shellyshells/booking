@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Room Reservation System</title>
+    <link rel="stylesheet" href="/css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="logo">
+                <span class="logo-icon">🏢</span>
+                <span class="logo-text">RoomBook</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-view="dashboard">
+                    <span class="nav-icon">📊</span>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#" class="nav-item" data-view="rooms">
+                    <span class="nav-icon">🚪</span>
+                    <span>Rooms</span>
+                </a>
+                <a href="#" class="nav-item" data-view="reservations">
+                    <span class="nav-icon">📅</span>
+                    <span>Reservations</span>
+                </a>
+                <a href="#" class="nav-item" data-view="book">
+                    <span class="nav-icon">➕</span>
+                    <span>Book Room</span>
+                </a>
+                <div class="nav-divider"></div>
+                <a href="#" class="nav-item" data-view="patterns">
+                    <span class="nav-icon">🧩</span>
+                    <span>Design Patterns</span>
+                </a>
+                <a href="#" class="nav-item" data-view="logs">
+                    <span class="nav-icon">📝</span>
+                    <span>System Logs</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="system-status">
+                    <span class="status-dot"></span>
+                    <span>System Online</span>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-left">
+                    <h1 id="page-title">Dashboard</h1>
+                    <p id="page-subtitle">Overview of your room reservation system</p>
+                </div>
+                <div class="header-right">
+                    <div class="search-box">
+                        <input type="text" placeholder="Search rooms..." id="global-search">
+                        <span class="search-icon">🔍</span>
+                    </div>
+                    <div class="user-avatar">
+                        <span>👤</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Dynamic Content Area -->
+            <div class="content-area" id="content-area">
+                <!-- Dashboard View -->
+                <div id="dashboard-view" class="view active">
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <div class="stat-icon blue">🚪</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-total-rooms">0</span>
+                                <span class="stat-label">Total Rooms</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon green">✅</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-available-rooms">0</span>
+                                <span class="stat-label">Available</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon purple">📅</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-reservations">0</span>
+                                <span class="stat-label">Reservations</span>
+                            </div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-icon orange">⏰</div>
+                            <div class="stat-info">
+                                <span class="stat-value" id="stat-today-bookings">0</span>
+                                <span class="stat-label">Today's Bookings</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Rooms by Type</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="rooms-by-type-chart" class="chart-container"></div>
+                            </div>
+                        </div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Recent Activity</h3>
+                            </div>
+                            <div class="card-body">
+                                <div id="recent-activity" class="activity-list"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Quick Room Overview</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="quick-rooms" class="rooms-grid"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rooms View -->
+                <div id="rooms-view" class="view">
+                    <div class="view-header">
+                        <div class="filter-bar">
+                            <select id="room-type-filter" class="filter-select">
+                                <option value="">All Types</option>
+                                <option value="Conference">Conference</option>
+                                <option value="Meeting">Meeting</option>
+                                <option value="Training">Training</option>
+                                <option value="Auditorium">Auditorium</option>
+                                <option value="Private Office">Private Office</option>
+                            </select>
+                            <select id="room-floor-filter" class="filter-select">
+                                <option value="">All Floors</option>
+                                <option value="0">Ground Floor</option>
+                                <option value="1">Floor 1</option>
+                                <option value="2">Floor 2</option>
+                                <option value="3">Floor 3</option>
+                            </select>
+                            <input type="number" id="room-capacity-filter" placeholder="Min Capacity" class="filter-input">
+                        </div>
+                        <button class="btn btn-primary" onclick="app.openCreateRoomModal()">
+                            <span>➕</span> Add Room
+                        </button>
+                    </div>
+                    <div id="rooms-list" class="rooms-grid"></div>
+                </div>
+
+                <!-- Reservations View -->
+                <div id="reservations-view" class="view">
+                    <div class="view-header">
+                        <div class="filter-bar">
+                            <select id="reservation-status-filter" class="filter-select">
+                                <option value="">All Status</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Checked In">Checked In</option>
+                                <option value="Completed">Completed</option>
+                                <option value="Cancelled">Cancelled</option>
+                            </select>
+                            <input type="date" id="reservation-date-filter" class="filter-input">
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Room</th>
+                                    <th>User</th>
+                                    <th>Date & Time</th>
+                                    <th>Attendees</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reservations-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Book Room View -->
+                <div id="book-view" class="view">
+                    <div class="booking-container">
+                        <div class="booking-form-section">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>📅 New Reservation</h3>
+                                </div>
+                                <div class="card-body">
+                                    <form id="booking-form" class="form">
+                                        <div class="form-group">
+                                            <label for="book-room">Select Room *</label>
+                                            <select id="book-room" required></select>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="book-name">Your Name *</label>
+                                                <input type="text" id="book-name" required placeholder="John Doe">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="book-email">Email *</label>
+                                                <input type="email" id="book-email" required placeholder="john@example.com">
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="book-date">Date *</label>
+                                                <input type="date" id="book-date" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="book-attendees">Attendees *</label>
+                                                <input type="number" id="book-attendees" min="1" required value="1">
+                                            </div>
+                                        </div>
+                                        <div class="form-row">
+                                            <div class="form-group">
+                                                <label for="book-start">Start Time *</label>
+                                                <input type="time" id="book-start" required value="09:00">
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="book-end">End Time *</label>
+                                                <input type="time" id="book-end" required value="10:00">
+                                            </div>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="book-purpose">Purpose</label>
+                                            <textarea id="book-purpose" rows="3" placeholder="Meeting purpose..."></textarea>
+                                        </div>
+                                        <div class="form-group">
+                                            <label for="book-role">Validation Strategy</label>
+                                            <select id="book-role">
+                                                <option value="standard">Standard (Default Rules)</option>
+                                                <option value="vip">VIP (Extended Privileges)</option>
+                                                <option value="admin">Admin (Minimal Restrictions)</option>
+                                            </select>
+                                            <small class="form-hint">Different strategies apply different validation rules</small>
+                                        </div>
+                                        <button type="submit" class="btn btn-primary btn-block">
+                                            Create Reservation
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="room-preview-section">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h3>🚪 Room Details</h3>
+                                </div>
+                                <div class="card-body" id="selected-room-preview">
+                                    <p class="placeholder-text">Select a room to see details</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Design Patterns View -->
+                <div id="patterns-view" class="view">
+                    <div class="patterns-intro">
+                        <h2>🧩 Design Patterns Implemented</h2>
+                        <p>This application demonstrates several Gang of Four (GoF) design patterns applied to a real-world room reservation system.</p>
+                    </div>
+                    <div class="patterns-grid">
+                        <div class="pattern-card singleton">
+                            <div class="pattern-icon">1️⃣</div>
+                            <h3>Singleton</h3>
+                            <p class="pattern-type">Creational Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Ensures only one instance of the Logger and Configuration Manager exists globally throughout the application.</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>LOGGER - Global logging system</li>
+                                    <li>CONFIG - Application configuration</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="pattern-card factory">
+                            <div class="pattern-icon">🏭</div>
+                            <h3>Factory Method</h3>
+                            <p class="pattern-type">Creational Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Creates room objects dynamically based on type without exposing instantiation logic.</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>RoomFactoryManager - Room creation</li>
+                                    <li>Different factories for each room type</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="pattern-card composite">
+                            <div class="pattern-icon">🌳</div>
+                            <h3>Composite</h3>
+                            <p class="pattern-type">Structural Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Treats individual rooms and groups of rooms uniformly for bulk operations.</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>RoomGroup - Grouping rooms by floor/building</li>
+                                    <li>Bulk reservations</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="pattern-card flyweight">
+                            <div class="pattern-icon">🪶</div>
+                            <h3>Flyweight</h3>
+                            <p class="pattern-type">Structural Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Shares immutable room type information across many room instances, reducing memory usage.</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>RoomTypeInfo - Shared type metadata</li>
+                                    <li>Default equipment and rates</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="pattern-card strategy">
+                            <div class="pattern-icon">🎯</div>
+                            <h3>Strategy</h3>
+                            <p class="pattern-type">Behavioral Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Allows different validation rules for different user types (Standard, VIP, Admin).</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>StandardValidationStrategy</li>
+                                    <li>VipValidationStrategy</li>
+                                    <li>AdminValidationStrategy</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="pattern-card observer">
+                            <div class="pattern-icon">👁️</div>
+                            <h3>Observer</h3>
+                            <p class="pattern-type">Behavioral Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Decouples event sources from handlers. Multiple observers react to reservation events.</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>EmailNotifier</li>
+                                    <li>AnalyticsTracker</li>
+                                    <li>AuditLogger</li>
+                                    <li>SlackNotifier</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="pattern-card adapter">
+                            <div class="pattern-icon">🔌</div>
+                            <h3>Adapter</h3>
+                            <p class="pattern-type">Structural Pattern</p>
+                            <div class="pattern-details">
+                                <strong>Problem Solved:</strong>
+                                <p>Integrates with external calendar APIs without modifying core application code.</p>
+                                <strong>Where Used:</strong>
+                                <ul>
+                                    <li>GoogleCalendarAdapter</li>
+                                    <li>OutlookCalendarAdapter</li>
+                                    <li>ICalAdapter</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>📊 Active Observers</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="observers-list" class="observers-grid"></div>
+                        </div>
+                    </div>
+                    <div class="card mt-4">
+                        <div class="card-header">
+                            <h3>🎯 Validation Strategies</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="strategies-list" class="strategies-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Logs View -->
+                <div id="logs-view" class="view">
+                    <div class="view-header">
+                        <div class="filter-bar">
+                            <select id="log-level-filter" class="filter-select">
+                                <option value="">All Levels</option>
+                                <option value="Debug">Debug</option>
+                                <option value="Info">Info</option>
+                                <option value="Warning">Warning</option>
+                                <option value="Error">Error</option>
+                            </select>
+                            <button class="btn btn-secondary" onclick="app.refreshLogs()">
+                                🔄 Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="logs-container">
+                        <div id="logs-list" class="logs-list"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Modal Title</h3>
+                <button class="modal-close" onclick="app.closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
