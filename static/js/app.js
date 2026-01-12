@@ -8,6 +8,7 @@ class App {
         this.rooms = [];
         this.reservations = [];
         this.statistics = null;
+        this.allLogs = [];
         
         this.init();
     }
@@ -44,6 +45,18 @@ class App {
             this.updateRoomPreview(e.target.value);
         });
 
+        // Global search bar
+        const globalSearch = document.getElementById('global-search');
+        if (globalSearch) {
+            globalSearch.addEventListener('input', (e) => this.handleGlobalSearch(e.target.value));
+            globalSearch.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.handleGlobalSearch(e.target.value);
+                }
+            });
+        }
+
         // Filters
         document.getElementById('room-type-filter')?.addEventListener('change', () => this.filterRooms());
         document.getElementById('room-floor-filter')?.addEventListener('change', () => this.filterRooms());
@@ -52,10 +65,55 @@ class App {
         document.getElementById('reservation-status-filter')?.addEventListener('change', () => this.filterReservations());
         document.getElementById('reservation-date-filter')?.addEventListener('change', () => this.filterReservations());
 
+        // Log level filter
+        document.getElementById('log-level-filter')?.addEventListener('change', () => this.filterLogs());
+
         // Set default date to today
         const today = new Date().toISOString().split('T')[0];
         const dateInput = document.getElementById('book-date');
         if (dateInput) dateInput.value = today;
+    }
+
+    // Handle global search
+    handleGlobalSearch(query) {
+        const searchTerm = query.toLowerCase().trim();
+        
+        if (!searchTerm) {
+            // If empty, show appropriate view
+            if (this.currentView === 'rooms') {
+                this.renderRooms();
+            } else if (this.currentView === 'reservations') {
+                this.renderReservations();
+            }
+            return;
+        }
+
+        // Search rooms
+        const matchedRooms = this.rooms.filter(room => 
+            room.name.toLowerCase().includes(searchTerm) ||
+            room.room_type.toLowerCase().includes(searchTerm) ||
+            (room.equipment && room.equipment.some(e => e.toLowerCase().includes(searchTerm)))
+        );
+
+        // Search reservations
+        const matchedReservations = this.reservations.filter(res => {
+            const room = this.rooms.find(r => r.id === res.room_id);
+            return res.user_name.toLowerCase().includes(searchTerm) ||
+                   res.user_email.toLowerCase().includes(searchTerm) ||
+                   res.purpose.toLowerCase().includes(searchTerm) ||
+                   (room && room.name.toLowerCase().includes(searchTerm));
+        });
+
+        // Navigate to appropriate view and show results
+        if (matchedRooms.length > 0 && this.currentView !== 'reservations') {
+            this.showView('rooms');
+            this.renderRooms(matchedRooms);
+        } else if (matchedReservations.length > 0) {
+            this.showView('reservations');
+            this.renderReservations(matchedReservations);
+        } else if (matchedRooms.length === 0 && matchedReservations.length === 0) {
+            this.showToast('No results found', 'warning');
+        }
     }
 
     // Load all data from API
@@ -566,12 +624,44 @@ class App {
     // Load system logs
     async loadLogs() {
         try {
+            
             const response = await fetch('/api/logs?count=100');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             const data = await response.json();
-            this.renderLogs(data.data || []);
+            
+            this.allLogs = data.data || [];
+            this.renderLogs(this.allLogs);
         } catch (error) {
             console.error('Error loading logs:', error);
+            const container = document.getElementById('logs-list');
+            if (container) {
+                container.innerHTML = '<div class="log-entry"><span class="log-message">Error loading logs: ' + error.message + '</span></div>';
+            }
         }
+    }
+
+    // Filter logs by type
+    filterLogs() {
+        const filterValue = document.getElementById('log-level-filter')?.value;
+        
+        if (!filterValue) {
+            this.renderLogs(this.allLogs || []);
+            return;
+        }
+
+        let filtered;
+        if (filterValue === 'Error') {
+            // Show only errors
+            filtered = (this.allLogs || []).filter(log => log.is_error);
+        } else {
+            // Filter by action type
+            filtered = (this.allLogs || []).filter(log => 
+                log.action === filterValue
+            );
+        }
+        this.renderLogs(filtered);
     }
 
     // Refresh logs
@@ -583,21 +673,42 @@ class App {
     // Render logs
     renderLogs(logs) {
         const container = document.getElementById('logs-list');
-        if (!container) return;
-
-        if (logs.length === 0) {
-            container.innerHTML = '<div class="log-entry">No logs available</div>';
+        if (!container) {
             return;
         }
 
-        container.innerHTML = logs.map(log => `
-            <div class="log-entry">
-                <span class="log-timestamp">${log.timestamp}</span>
-                <span class="log-level ${log.level.toLowerCase()}">${log.level}</span>
-                <span class="log-context">[${log.context || '-'}]</span>
-                <span class="log-message">${log.message}</span>
-            </div>
-        `).join('');
+        if (!logs || logs.length === 0) {
+            container.innerHTML = '<div class="log-entry"><span class="log-message">No activity yet. Create or cancel a reservation to see logs.</span></div>';
+            return;
+        }
+
+        container.innerHTML = logs.map(log => {
+            const actionClass = log.is_error ? 'error' : log.action.toLowerCase().replace('_', '-');
+            const actionIcon = this.getActionIcon(log.action);
+            
+            return `
+                <div class="log-entry ${log.is_error ? 'error-entry' : ''}">
+                    <span class="log-timestamp">${log.timestamp}</span>
+                    <span class="log-action ${actionClass}">${actionIcon} ${log.action.replace(/_/g, ' ')}</span>
+                    <span class="log-user">${log.user || 'System'}</span>
+                    <span class="log-details">${log.details}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Get icon for action type
+    getActionIcon(action) {
+        const icons = {
+            'RESERVATION_CREATED': '✅',
+            'RESERVATION_CANCELLED': '❌',
+            'RESERVATION_CONFIRMED': '✔️',
+            'CHECK_IN': '🚪',
+            'ROOM_CREATED': '🏠',
+            'ERROR': '⚠️',
+            'VALIDATION_ERROR': '⛔'
+        };
+        return icons[action] || '📋';
     }
 
     // Open create room modal

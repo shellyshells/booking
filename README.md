@@ -3,8 +3,6 @@
 A comprehensive room reservation system demonstrating advanced **Object-Oriented Programming (OOP) design patterns** in **Rust**. This project features a modern web interface and implements multiple Gang of Four (GoF) design patterns.
 
 ![Rust](https://img.shields.io/badge/Rust-1.75+-orange?style=flat-square&logo=rust)
-![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
-![Patterns](https://img.shields.io/badge/Design_Patterns-7-green?style=flat-square)
 
 ## 🌟 Features
 
@@ -50,8 +48,8 @@ A comprehensive room reservation system demonstrating advanced **Object-Oriented
 
 1. **Extract the project** (if downloaded as zip):
    ```bash
-   unzip room-reservation-system.zip
-   cd room-reservation-system
+   unzip booking.zip
+   cd booking
    ```
 
 2. **Build the project**:
@@ -285,11 +283,6 @@ CONFIG.update(|config| {
     config.max_reservation_days = 60;
 });
 ```
-
-## 📝 License
-
-MIT License - Feel free to use and modify.
-
 ---
 
-**Built with ❤️ using Rust and modern web technologies**
+

@@ -1,5 +1,5 @@
 // =============================================================================
-// SINGLETON PATTERN - Logger & Configuration Manager
+// SINGLETON PATTERN - Activity Logger & Configuration Manager
 // =============================================================================
 // Problem Solved: Ensures only one instance of logger/config exists globally
 // Location: Used throughout the application for logging and configuration
@@ -12,145 +12,155 @@ use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 
 // -----------------------------------------------------------------------------
-// Log Entry Structure
+// Activity Log Entry - Tracks user actions
 // -----------------------------------------------------------------------------
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LogEntry {
+pub struct ActivityEntry {
     pub timestamp: String,
-    pub level: LogLevel,
-    pub message: String,
-    pub context: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub enum LogLevel {
-    Debug,
-    Info,
-    Warning,
-    Error,
-}
-
-impl std::fmt::Display for LogLevel {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            LogLevel::Debug => write!(f, "DEBUG"),
-            LogLevel::Info => write!(f, "INFO"),
-            LogLevel::Warning => write!(f, "WARN"),
-            LogLevel::Error => write!(f, "ERROR"),
-        }
-    }
+    pub action: String,
+    pub details: String,
+    pub user: Option<String>,
+    pub is_error: bool,
 }
 
 // -----------------------------------------------------------------------------
-// Logger Singleton - Thread-safe global logger
+// Activity Logger Singleton - Thread-safe global activity tracker
 // -----------------------------------------------------------------------------
-pub struct Logger {
-    logs: RwLock<VecDeque<LogEntry>>,
+pub struct ActivityLogger {
+    entries: RwLock<VecDeque<ActivityEntry>>,
     max_entries: usize,
-    min_level: RwLock<LogLevel>,
 }
 
-impl Logger {
+impl ActivityLogger {
     fn new() -> Self {
-        Logger {
-            logs: RwLock::new(VecDeque::with_capacity(1000)),
-            max_entries: 1000,
-            min_level: RwLock::new(LogLevel::Debug),
+        ActivityLogger {
+            entries: RwLock::new(VecDeque::with_capacity(500)),
+            max_entries: 500,
         }
     }
 
-    // Log a message with a given level
-    pub fn log(&self, level: LogLevel, message: &str, context: Option<&str>) {
-        let min_level = self.min_level.read().unwrap();
-        if !self.should_log(&level, &min_level) {
-            return;
+    /// Log a reservation creation
+    pub fn log_reservation_created(&self, reservation_id: &str, user_name: &str, user_email: &str, room_name: &str, date: &str) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "RESERVATION_CREATED".to_string(),
+            details: format!("Room '{}' booked for {}", room_name, date),
+            user: Some(format!("{} ({})", user_name, user_email)),
+            is_error: false,
+        });
+        println!("[ACTIVITY] Reservation created: {} by {} for {}", reservation_id, user_name, room_name);
+    }
+
+    /// Log a reservation cancellation
+    pub fn log_reservation_cancelled(&self, reservation_id: &str, user_name: &str, room_name: &str) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "RESERVATION_CANCELLED".to_string(),
+            details: format!("Booking for room '{}' was cancelled", room_name),
+            user: Some(user_name.to_string()),
+            is_error: false,
+        });
+        println!("[ACTIVITY] Reservation cancelled: {} by {}", reservation_id, user_name);
+    }
+
+    /// Log a reservation confirmation
+    pub fn log_reservation_confirmed(&self, reservation_id: &str, user_name: &str, room_name: &str) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "RESERVATION_CONFIRMED".to_string(),
+            details: format!("Booking for room '{}' was confirmed", room_name),
+            user: Some(user_name.to_string()),
+            is_error: false,
+        });
+        println!("[ACTIVITY] Reservation confirmed: {} by {}", reservation_id, user_name);
+    }
+
+    /// Log a check-in
+    pub fn log_checkin(&self, reservation_id: &str, user_name: &str, room_name: &str) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "CHECK_IN".to_string(),
+            details: format!("Checked in to room '{}'", room_name),
+            user: Some(user_name.to_string()),
+            is_error: false,
+        });
+        println!("[ACTIVITY] Check-in: {} by {}", reservation_id, user_name);
+    }
+
+    /// Log a room creation
+    pub fn log_room_created(&self, room_name: &str, room_type: &str) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "ROOM_CREATED".to_string(),
+            details: format!("New {} room '{}' added to system", room_type, room_name),
+            user: Some("Admin".to_string()),
+            is_error: false,
+        });
+        println!("[ACTIVITY] Room created: {} ({})", room_name, room_type);
+    }
+
+    /// Log an error
+    pub fn log_error(&self, error_message: &str, context: Option<&str>) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "ERROR".to_string(),
+            details: error_message.to_string(),
+            user: context.map(|s| s.to_string()),
+            is_error: true,
+        });
+        println!("[ERROR] {}: {}", context.unwrap_or("System"), error_message);
+    }
+
+    /// Log a validation error
+    pub fn log_validation_error(&self, user_name: &str, error: &str) {
+        self.add_entry(ActivityEntry {
+            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+            action: "VALIDATION_ERROR".to_string(),
+            details: error.to_string(),
+            user: Some(user_name.to_string()),
+            is_error: true,
+        });
+        println!("[VALIDATION ERROR] {}: {}", user_name, error);
+    }
+
+    fn add_entry(&self, entry: ActivityEntry) {
+        let mut entries = self.entries.write().unwrap();
+        if entries.len() >= self.max_entries {
+            entries.pop_front();
         }
-        drop(min_level);
-
-        let entry = LogEntry {
-            timestamp: Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
-            level: level.clone(),
-            message: message.to_string(),
-            context: context.map(|s| s.to_string()),
-        };
-
-        // Print to console
-        let ctx = context.unwrap_or("-");
-        println!("[{}] [{}] [{}] {}", entry.timestamp, level, ctx, message);
-
-        // Store in memory buffer
-        let mut logs = self.logs.write().unwrap();
-        if logs.len() >= self.max_entries {
-            logs.pop_front();
-        }
-        logs.push_back(entry);
+        entries.push_back(entry);
     }
 
-    fn should_log(&self, level: &LogLevel, min_level: &LogLevel) -> bool {
-        let level_priority = |l: &LogLevel| match l {
-            LogLevel::Debug => 0,
-            LogLevel::Info => 1,
-            LogLevel::Warning => 2,
-            LogLevel::Error => 3,
-        };
-        level_priority(level) >= level_priority(min_level)
+    /// Get recent activity entries
+    pub fn get_entries(&self, count: usize) -> Vec<ActivityEntry> {
+        let entries = self.entries.read().unwrap();
+        entries.iter().rev().take(count).cloned().collect()
     }
 
-    // Convenience methods for different log levels
-    pub fn debug(&self, message: &str, context: Option<&str>) {
-        self.log(LogLevel::Debug, message, context);
+    /// Get only error entries
+    pub fn get_errors(&self, count: usize) -> Vec<ActivityEntry> {
+        let entries = self.entries.read().unwrap();
+        entries.iter().rev().filter(|e| e.is_error).take(count).cloned().collect()
     }
 
-    pub fn info(&self, message: &str, context: Option<&str>) {
-        self.log(LogLevel::Info, message, context);
-    }
-
-    pub fn warning(&self, message: &str, context: Option<&str>) {
-        self.log(LogLevel::Warning, message, context);
-    }
-
-    pub fn error(&self, message: &str, context: Option<&str>) {
-        self.log(LogLevel::Error, message, context);
-    }
-
-    // Retrieve recent logs
-    pub fn get_logs(&self, count: usize) -> Vec<LogEntry> {
-        let logs = self.logs.read().unwrap();
-        logs.iter().rev().take(count).cloned().collect()
-    }
-
-    // Set minimum log level
-    pub fn set_min_level(&self, level: LogLevel) {
-        let mut min_level = self.min_level.write().unwrap();
-        *min_level = level;
-    }
-
-    // Clear all logs
+    /// Clear all entries
     pub fn clear(&self) {
-        let mut logs = self.logs.write().unwrap();
-        logs.clear();
+        let mut entries = self.entries.write().unwrap();
+        entries.clear();
     }
 }
 
-// Global singleton instance using Lazy initialization
-pub static LOGGER: Lazy<Arc<Logger>> = Lazy::new(|| Arc::new(Logger::new()));
+// Global singleton instance
+pub static ACTIVITY_LOG: Lazy<Arc<ActivityLogger>> = Lazy::new(|| Arc::new(ActivityLogger::new()));
 
-// Convenient global functions
-pub fn log_debug(message: &str, context: Option<&str>) {
-    LOGGER.debug(message, context);
-}
-
-pub fn log_info(message: &str, context: Option<&str>) {
-    LOGGER.info(message, context);
-}
-
-pub fn log_warning(message: &str, context: Option<&str>) {
-    LOGGER.warning(message, context);
-}
-
-pub fn log_error(message: &str, context: Option<&str>) {
-    LOGGER.error(message, context);
-}
+// Backward-compatible log functions (no-op for internal pattern logging)
+// These exist only to avoid breaking the other pattern modules
+#[inline]
+pub fn log_info(_message: &str, _context: Option<&str>) {}
+#[inline]
+pub fn log_warning(_message: &str, _context: Option<&str>) {}
+#[inline] 
+pub fn log_error(_message: &str, _context: Option<&str>) {}
 
 // -----------------------------------------------------------------------------
 // Configuration Singleton - Global application settings
@@ -200,15 +210,6 @@ impl ConfigManager {
     pub fn get(&self) -> AppConfig {
         self.config.read().unwrap().clone()
     }
-
-    pub fn update<F>(&self, updater: F)
-    where
-        F: FnOnce(&mut AppConfig),
-    {
-        let mut config = self.config.write().unwrap();
-        updater(&mut config);
-        log_info("Configuration updated", Some("ConfigManager"));
-    }
 }
 
 // Global configuration singleton
@@ -219,13 +220,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_logger_singleton() {
-        // Both calls should return the same instance
-        log_info("Test message 1", Some("Test"));
-        log_info("Test message 2", Some("Test"));
+    fn test_activity_logger_singleton() {
+        ACTIVITY_LOG.log_reservation_created("res-1", "John", "john@test.com", "Room Alpha", "2026-01-15");
+        ACTIVITY_LOG.log_reservation_cancelled("res-1", "John", "Room Alpha");
         
-        let logs = LOGGER.get_logs(10);
-        assert!(logs.len() >= 2);
+        let entries = ACTIVITY_LOG.get_entries(10);
+        assert!(entries.len() >= 2);
     }
 
     #[test]

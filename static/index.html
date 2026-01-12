@@ -403,11 +403,13 @@
                     <div class="view-header">
                         <div class="filter-bar">
                             <select id="log-level-filter" class="filter-select">
-                                <option value="">All Levels</option>
-                                <option value="Debug">Debug</option>
-                                <option value="Info">Info</option>
-                                <option value="Warning">Warning</option>
-                                <option value="Error">Error</option>
+                                <option value="">All Activities</option>
+                                <option value="RESERVATION_CREATED">Reservations Created</option>
+                                <option value="RESERVATION_CANCELLED">Reservations Cancelled</option>
+                                <option value="RESERVATION_CONFIRMED">Reservations Confirmed</option>
+                                <option value="CHECK_IN">Check-ins</option>
+                                <option value="ROOM_CREATED">Rooms Created</option>
+                                <option value="Error">Errors Only</option>
                             </select>
                             <button class="btn btn-secondary" onclick="app.refreshLogs()">
                                 🔄 Refresh

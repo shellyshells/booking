@@ -10,23 +10,23 @@ use crate::models::{
 };
 use crate::patterns::{
     adapter::CalendarService,
-    composite::{ComponentSummary, RoomGroup, RoomGroupManager, RoomGroupType},
+    composite::{RoomGroupManager, RoomGroupType},
     factory::RoomFactoryManager,
-    flyweight::{get_all_room_types, get_room_type_info, FlyweightStats, RoomTypeInfo, ROOM_TYPE_FLYWEIGHT},
+    flyweight::{get_all_room_types, FlyweightStats, RoomTypeInfo, ROOM_TYPE_FLYWEIGHT},
     observer::{
         create_default_observers, EventPublisher, ObserverInfo, ReservationEvent,
         ReservationEventData,
     },
-    singleton::{log_error, log_info, log_warning, AppConfig, LogEntry, CONFIG, LOGGER},
+    singleton::{ActivityEntry, AppConfig, CONFIG, ACTIVITY_LOG},
     strategy::{
         get_available_strategies, get_strategy_for_role, StrategyInfo, ValidationContext,
         ValidationResult,
     },
 };
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::RwLock;
 
 // -----------------------------------------------------------------------------
 // Application State - Central state management
@@ -41,8 +41,6 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
-        log_info("Initializing application state", Some("AppState"));
-
         let state = AppState {
             rooms: RwLock::new(HashMap::new()),
             reservations: RwLock::new(HashMap::new()),
@@ -59,13 +57,10 @@ impl AppState {
         // Add sample data
         state.add_sample_data();
 
-        log_info("Application state initialized successfully", Some("AppState"));
         state
     }
 
     fn add_sample_data(&self) {
-        log_info("Adding sample data", Some("AppState"));
-
         // Create sample rooms using Factory pattern
         let rooms_to_create = vec![
             ("Alpha", RoomType::Conference, 20, 1),
@@ -95,22 +90,17 @@ impl AppState {
         let mut groups = self.room_groups.write().unwrap();
         
         // Floor 1 group
-        let floor1_id = groups.create_group(
+        let _floor1_id = groups.create_group(
             "Floor 1 - Executive".to_string(),
             "All rooms on the first floor - executive area".to_string(),
             RoomGroupType::Floor,
         );
 
         // Floor 2 group
-        let floor2_id = groups.create_group(
+        let _floor2_id = groups.create_group(
             "Floor 2 - Operations".to_string(),
             "Operations and training center".to_string(),
             RoomGroupType::Floor,
-        );
-
-        log_info(
-            &format!("Created {} sample rooms and {} room groups", rooms.len(), 2),
-            Some("AppState"),
         );
     }
 
@@ -133,7 +123,9 @@ impl AppState {
         let mut rooms = self.rooms.write().unwrap();
         rooms.insert(id.clone(), room.clone());
 
-        log_info(&format!("Created room: {} ({})", room.name, id), Some("RoomService"));
+        // Log the activity
+        ACTIVITY_LOG.log_room_created(&room.name, room.room_type.as_str());
+        
         Ok(room)
     }
 
@@ -168,7 +160,6 @@ impl AppState {
             room.description = Some(desc);
         }
 
-        log_info(&format!("Updated room: {}", id), Some("RoomService"));
         Ok(room.clone())
     }
 
@@ -185,7 +176,6 @@ impl AppState {
         let mut rooms = self.rooms.write().unwrap();
         rooms.remove(id).ok_or("Room not found")?;
 
-        log_info(&format!("Deleted room: {}", id), Some("RoomService"));
         Ok(())
     }
 
@@ -258,9 +248,10 @@ impl AppState {
         let validation = context.validate(&reservation, &room, &existing);
 
         if !validation.is_valid {
-            log_warning(
-                &format!("Reservation validation failed: {:?}", validation.errors),
-                Some("ReservationService"),
+            // Log validation error
+            ACTIVITY_LOG.log_validation_error(
+                &request.user_name,
+                &validation.errors.join(", ")
             );
             return Ok(ReservationResult {
                 success: false,
@@ -286,7 +277,15 @@ impl AppState {
         };
         self.event_publisher.publish(ReservationEvent::Created(event_data));
 
-        log_info(&format!("Created reservation: {}", id), Some("ReservationService"));
+        // Log the activity
+        let date_str = reservation.start_time.format("%Y-%m-%d %H:%M").to_string();
+        ACTIVITY_LOG.log_reservation_created(
+            &id,
+            &reservation.user_name,
+            &reservation.user_email,
+            &room.name,
+            &date_str
+        );
 
         Ok(ReservationResult {
             success: true,
@@ -344,10 +343,17 @@ impl AppState {
             return Err("Reservation is already cancelled".to_string());
         }
 
+        let user_name = reservation.user_name.clone();
+        let room_id = reservation.room_id.clone();
         reservation.cancel();
 
+        // Get room name and log
+        let room_name = self.get_room(&room_id)
+            .map(|r| r.name.clone())
+            .unwrap_or_else(|| "Unknown Room".to_string());
+
         // Publish cancellation event
-        if let Some(room) = self.get_room(&reservation.room_id) {
+        if let Some(room) = self.get_room(&room_id) {
             let event_data = ReservationEventData {
                 reservation_id: reservation.id.clone(),
                 room_id: room.id.clone(),
@@ -360,28 +366,54 @@ impl AppState {
             };
             drop(reservations); // Release lock before publishing
             self.event_publisher.publish(ReservationEvent::Cancelled(event_data));
+        } else {
+            drop(reservations);
         }
 
-        log_info(&format!("Cancelled reservation: {}", id), Some("ReservationService"));
+        // Log the cancellation
+        ACTIVITY_LOG.log_reservation_cancelled(id, &user_name, &room_name);
+        
         self.get_reservation(id).ok_or("Reservation not found".to_string())
     }
 
     pub fn confirm_reservation(&self, id: &str) -> Result<Reservation, String> {
         let mut reservations = self.reservations.write().unwrap();
         let reservation = reservations.get_mut(id).ok_or("Reservation not found")?;
+        
+        let user_name = reservation.user_name.clone();
+        let room_id = reservation.room_id.clone();
         reservation.confirm();
+        let result = reservation.clone();
+        drop(reservations);
 
-        log_info(&format!("Confirmed reservation: {}", id), Some("ReservationService"));
-        Ok(reservation.clone())
+        // Get room name and log
+        let room_name = self.get_room(&room_id)
+            .map(|r| r.name.clone())
+            .unwrap_or_else(|| "Unknown Room".to_string());
+        
+        ACTIVITY_LOG.log_reservation_confirmed(id, &user_name, &room_name);
+        
+        Ok(result)
     }
 
     pub fn check_in(&self, id: &str) -> Result<Reservation, String> {
         let mut reservations = self.reservations.write().unwrap();
         let reservation = reservations.get_mut(id).ok_or("Reservation not found")?;
+        
+        let user_name = reservation.user_name.clone();
+        let room_id = reservation.room_id.clone();
         reservation.check_in();
+        let result = reservation.clone();
+        drop(reservations);
 
-        log_info(&format!("Checked in reservation: {}", id), Some("ReservationService"));
-        Ok(reservation.clone())
+        // Get room name and log
+        let room_name = self.get_room(&room_id)
+            .map(|r| r.name.clone())
+            .unwrap_or_else(|| "Unknown Room".to_string());
+        
+        ACTIVITY_LOG.log_checkin(id, &user_name, &room_name);
+        
+        Ok(result)
     }
 
     // -------------------------------------------------------------------------
@@ -476,8 +508,8 @@ impl AppState {
         CONFIG.get()
     }
 
-    pub fn get_logs(&self, count: usize) -> Vec<LogEntry> {
-        LOGGER.get_logs(count)
+    pub fn get_logs(&self, count: usize) -> Vec<ActivityEntry> {
+        ACTIVITY_LOG.get_entries(count)
     }
 
     pub fn get_room_types(&self) -> Vec<RoomTypeInfo> {

@@ -6,7 +6,7 @@ mod models;
 mod patterns;
 mod services;
 
-use patterns::singleton::{log_info, CONFIG};
+use patterns::singleton::CONFIG;
 use services::AppState;
 use std::fs;
 use std::io::Read;
@@ -14,14 +14,9 @@ use std::sync::Arc;
 use tiny_http::{Header, Method, Request, Response, Server};
 
 fn main() {
-    env_logger::init();
-    log_info("Starting Room Reservation System", Some("Main"));
-
     let config = CONFIG.get();
     let bind_address = format!("{}:{}", config.server_host, config.server_port);
     let app_state = Arc::new(AppState::new());
-
-    log_info(&format!("Server binding to {}", bind_address), Some("Main"));
 
     let server = Server::http(&bind_address).expect("Failed to start server");
 
@@ -41,8 +36,6 @@ fn main() {
 fn handle_request(mut request: Request, state: Arc<AppState>) {
     let url = request.url().to_string();
     let method = request.method().clone();
-    
-    log_info(&format!("{} {}", method, url), Some("HTTP"));
 
     // Handle POST routes that need body
     if method == Method::Post && url == "/api/rooms" {
